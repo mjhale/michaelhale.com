@@ -1,0 +1,64 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --breakpoint-xs: 420px;
+  --breakpoint-sm: 670px;
+  --breakpoint-md: 880px;
+  --breakpoint-lg: 1040px;
+  --breakpoint-xl: 1160px;
+
+  --color-brand-cream: hsl(47 31% 94%);
+  --color-brand-plum: hsl(284 28% 23%);
+  --color-brand-plum-dark: hsl(295 37% 12%);
+  --color-brand-lilac: hsl(297 19% 48%);
+  --color-brand-fog: hsl(49 12% 88%);
+  --color-brand-ink: hsl(0 0% 16%);
+  --color-brand-muted: hsl(0 0% 46%);
+
+  --font-sans: var(--font-sans-next), "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-serif: var(--font-serif-next), Georgia, serif;
+  --font-display: var(--font-display-next), "Times New Roman", serif;
+
+  --shadow-screenshot: 0 0.5vw 2.5vw rgba(0, 0, 0, 0.35), 0 2vw 4.75vw 1.25vw rgba(0, 0, 0, 0.18);
+}
+
+:root {
+  color-scheme: light;
+  --page-body-bg: hsl(284, 28%, 23%);
+  --page-header-bg: hsl(297, 19%, 48%);
+  --page-main-bg: hsl(47 31% 94% / 0.05);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--page-body-bg);
+  @apply text-black antialiased;
+}
+
+@media (max-width: 879px) {
+  body[data-mobile-menu-open='true'] .site-logo-link {
+    color: var(--page-header-bg);
+  }
+}
+
+.prose {
+  --tw-prose-body: hsl(0 0% 16%);
+  --tw-prose-headings: hsl(0 0% 10%);
+  --tw-prose-lead: hsl(0 0% 20%);
+  --tw-prose-links: hsl(0 0% 16%);
+  --tw-prose-bold: hsl(0 0% 10%);
+  --tw-prose-counters: hsl(0 0% 35%);
+  --tw-prose-bullets: hsl(0 0% 45%);
+  --tw-prose-hr: hsla(0 0% 20% / 0.2);
+  --tw-prose-quotes: hsl(0 0% 18%);
+  --tw-prose-quote-borders: hsla(0 0% 20% / 0.25);
+  --tw-prose-captions: hsl(0 0% 38%);
+  --tw-prose-code: hsl(0 0% 12%);
+  --tw-prose-pre-code: hsl(47 31% 94%);
+  --tw-prose-pre-bg: hsl(295 37% 12%);
+}
