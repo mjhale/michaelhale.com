@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import AppLink from '@/src/components/app-link';
 
 function sanitizeStyleValue(value) {
@@ -62,24 +61,52 @@ function createMdxImageComponent(defaults) {
   const routePath = normalizePathValue(defaults.routePath || '/');
   const imageManifest = defaults.imageManifest || {};
 
-  return function MdxImage(props) {
-    const { alt = '', src = '', title } = props;
-    const normalizedSrc = normalizePathValue(src);
+  function resolveSource(inputSource) {
+    const normalizedSrc = normalizePathValue(inputSource);
 
-    let resolvedSrc = normalizedSrc;
-
-    if (normalizedSrc.startsWith('./')) {
-      resolvedSrc = `${routePath}${normalizedSrc.slice(2)}`;
+    if (!normalizedSrc) {
+      return '';
     }
 
-    const dimensions = imageManifest[resolvedSrc];
-    const canUseNextImage =
-      resolvedSrc.startsWith('/') &&
-      dimensions &&
-      Number.isFinite(dimensions.width) &&
-      Number.isFinite(dimensions.height);
+    if (normalizedSrc.startsWith('./')) {
+      return `${routePath}${normalizedSrc.slice(2)}`;
+    }
 
-    if (!canUseNextImage) {
+    return normalizedSrc;
+  }
+
+  function toSrcSet(variants) {
+    return variants
+      .map(variant => `${variant.src} ${variant.width}w`)
+      .join(', ');
+  }
+
+  return function MdxImage(props) {
+    const { alt = '', src = '', title } = props;
+    const resolvedSrc = resolveSource(src);
+    const entry = imageManifest[resolvedSrc];
+    const dimensions =
+      entry &&
+      Number.isFinite(entry.width) &&
+      Number.isFinite(entry.height) &&
+      entry.width > 0 &&
+      entry.height > 0
+        ? { width: entry.width, height: entry.height }
+        : null;
+    const webpVariants = Array.isArray(entry?.variants?.webp)
+      ? entry.variants.webp
+      : [];
+    const fallbackVariants = Array.isArray(entry?.variants?.fallback)
+      ? entry.variants.fallback
+      : [];
+    const fallbackSrc = fallbackVariants.at(-1)?.src || resolvedSrc;
+    const fallbackSrcSet = fallbackVariants.length
+      ? toSrcSet(fallbackVariants)
+      : undefined;
+    const canUseResponsivePicture =
+      resolvedSrc.startsWith('/') && dimensions && fallbackSrc;
+
+    if (!canUseResponsivePicture) {
       // eslint-disable-next-line @next/next/no-img-element
       return (
         <img
@@ -92,15 +119,27 @@ function createMdxImageComponent(defaults) {
     }
 
     return (
-      <Image
-        alt={alt}
-        className="h-auto w-full border border-brand-ink"
-        height={dimensions.height}
-        sizes="(max-width: 1040px) 100vw, 1040px"
-        src={resolvedSrc}
-        title={title}
-        width={dimensions.width}
-      />
+      <picture>
+        {webpVariants.length ? (
+          <source
+            sizes="(max-width: 1040px) 100vw, 1040px"
+            srcSet={toSrcSet(webpVariants)}
+            type="image/webp"
+          />
+        ) : null}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          alt={alt}
+          className="h-auto w-full border border-brand-ink"
+          height={dimensions.height}
+          loading="lazy"
+          sizes="(max-width: 1040px) 100vw, 1040px"
+          src={fallbackSrc}
+          srcSet={fallbackSrcSet}
+          title={title}
+          width={dimensions.width}
+        />
+      </picture>
     );
   };
 }

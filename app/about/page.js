@@ -20,14 +20,9 @@ export default function AboutPage() {
         Elixir environments.
       </p>
       <p>
-        For consulting opportunities, employment, or recruiting inquiries,
-        please e-mail{' '}
+        For consulting opportunities or recruiting inquiries, reach out to{' '}
         <AppLink className="underline" href="mailto:mail@michaelhale.xyz">
           mail@michaelhale.xyz
-        </AppLink>{' '}
-        or send a message through the{' '}
-        <AppLink className="underline" href="/contact/">
-          contact form
         </AppLink>
         .
       </p>
