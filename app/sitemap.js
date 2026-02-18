@@ -8,6 +8,6 @@ export default function sitemap() {
   return [...staticRoutes, ...workRoutes].map(route => ({
     url: `${site.siteUrl}${route}`,
     changeFrequency: 'monthly',
-    priority: route === '/' ? 1 : 0.7
+    priority: route === '/' ? 1 : 0.7,
   }));
 }

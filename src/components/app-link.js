@@ -1,7 +1,11 @@
 import Link from 'next/link';
 
 function isExternal(href) {
-  return href?.startsWith('http://') || href?.startsWith('https://') || href?.startsWith('mailto:');
+  return (
+    href?.startsWith('http://') ||
+    href?.startsWith('https://') ||
+    href?.startsWith('mailto:')
+  );
 }
 
 export default function AppLink({ children, className, href, ...rest }) {

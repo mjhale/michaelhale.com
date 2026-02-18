@@ -6,7 +6,13 @@ export default function TechnologyIconList({ technologies }) {
       {technologies.map(technology => (
         <li className="p-1" key={technology.id}>
           {technology.iconImageUrl ? (
-            <Image alt={technology.title} className="block" height={30} src={technology.iconImageUrl} width={30} />
+            <Image
+              alt={technology.title}
+              className="block"
+              height={30}
+              src={technology.iconImageUrl}
+              width={30}
+            />
           ) : (
             <span className="inline-flex h-[30px] w-[30px] items-center justify-center rounded bg-brand-plum-dark text-xs">
               {technology.title.slice(0, 1)}

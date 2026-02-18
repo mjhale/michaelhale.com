@@ -31,21 +31,34 @@ function InputError({ message }) {
 }
 
 export default function ContactForm() {
-  const [values, setValues] = useState({ name: '', email: '', message: '', company: '' });
-  const [touched, setTouched] = useState({ name: false, email: false, message: false });
+  const [values, setValues] = useState({
+    name: '',
+    email: '',
+    message: '',
+    company: '',
+  });
+  const [touched, setTouched] = useState({
+    name: false,
+    email: false,
+    message: false,
+  });
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [status, setStatus] = useState({ type: 'idle', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const errors = validate(values);
 
-  const shouldShowError = fieldName => Boolean(errors[fieldName] && (touched[fieldName] || hasSubmitted));
+  const shouldShowError = fieldName =>
+    Boolean(errors[fieldName] && (touched[fieldName] || hasSubmitted));
 
   async function handleSubmit(event) {
     event.preventDefault();
     setHasSubmitted(true);
 
     if (Object.keys(errors).length) {
-      setStatus({ type: 'error', message: 'Please fix the highlighted fields.' });
+      setStatus({
+        type: 'error',
+        message: 'Please fix the highlighted fields.',
+      });
       return;
     }
 
@@ -56,22 +69,31 @@ export default function ContactForm() {
       const response = await fetch('/api/contact/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values)
+        body: JSON.stringify(values),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        setStatus({ type: 'error', message: result.message || 'Sorry, there was a submission error.' });
+        setStatus({
+          type: 'error',
+          message: result.message || 'Sorry, there was a submission error.',
+        });
         return;
       }
 
       setValues({ name: '', email: '', message: '', company: '' });
       setTouched({ name: false, email: false, message: false });
       setHasSubmitted(false);
-      setStatus({ type: 'success', message: 'Thank you! Michael will get back to you soon.' });
+      setStatus({
+        type: 'success',
+        message: 'Thank you! Michael will get back to you soon.',
+      });
     } catch (_error) {
-      setStatus({ type: 'error', message: 'Sorry, there was a submission error. Please try again.' });
+      setStatus({
+        type: 'error',
+        message: 'Sorry, there was a submission error. Please try again.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -83,7 +105,9 @@ export default function ContactForm() {
         autoComplete="off"
         className="hidden"
         name="company"
-        onChange={event => setValues(current => ({ ...current, company: event.target.value }))}
+        onChange={event =>
+          setValues(current => ({ ...current, company: event.target.value }))
+        }
         tabIndex={-1}
         value={values.company}
       />
@@ -96,7 +120,9 @@ export default function ContactForm() {
         className="mb-3 block w-full max-w-xl border border-brand-lilac bg-white p-2 text-brand-ink outline-offset-2 focus:outline focus:outline-1 focus:outline-brand-lilac"
         id="name"
         name="name"
-        onChange={event => setValues(current => ({ ...current, name: event.target.value }))}
+        onChange={event =>
+          setValues(current => ({ ...current, name: event.target.value }))
+        }
         onBlur={() => setTouched(current => ({ ...current, name: true }))}
         value={values.name}
       />
@@ -109,7 +135,9 @@ export default function ContactForm() {
         className="mb-3 block w-full max-w-xl border border-brand-lilac bg-white p-2 text-brand-ink outline-offset-2 focus:outline focus:outline-1 focus:outline-brand-lilac"
         id="email"
         name="email"
-        onChange={event => setValues(current => ({ ...current, email: event.target.value }))}
+        onChange={event =>
+          setValues(current => ({ ...current, email: event.target.value }))
+        }
         onBlur={() => setTouched(current => ({ ...current, email: true }))}
         type="email"
         value={values.email}
@@ -123,13 +151,21 @@ export default function ContactForm() {
         className="mb-3 block min-h-[10rem] w-full max-w-xl border border-brand-lilac bg-white p-2 text-brand-ink outline-offset-2 focus:outline focus:outline-1 focus:outline-brand-lilac"
         id="message"
         name="message"
-        onChange={event => setValues(current => ({ ...current, message: event.target.value }))}
+        onChange={event =>
+          setValues(current => ({ ...current, message: event.target.value }))
+        }
         onBlur={() => setTouched(current => ({ ...current, message: true }))}
         value={values.message}
       />
 
       {status.message ? (
-        <p className={status.type === 'error' ? 'text-red-600' : 'text-brand-cream'}>{status.message}</p>
+        <p
+          className={
+            status.type === 'error' ? 'text-red-600' : 'text-brand-cream'
+          }
+        >
+          {status.message}
+        </p>
       ) : null}
 
       <button

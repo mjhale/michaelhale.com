@@ -18,8 +18,8 @@ const frontmatterSchema = z.object({
   summary: z.string().min(1),
   style: z.object({
     screenshot_offset: z.string().min(1),
-    screenshot_shadow: z.string().min(1)
-  })
+    screenshot_shadow: z.string().min(1),
+  }),
 });
 
 function walk(dirPath) {
@@ -69,7 +69,9 @@ function dateSortValue(yyyyMm) {
 }
 
 function loadTechnologyMap() {
-  const technologyFiles = walk(technologyDir).filter(filePath => filePath.endsWith('.yml'));
+  const technologyFiles = walk(technologyDir).filter(filePath =>
+    filePath.endsWith('.yml')
+  );
   const entries = technologyFiles.map(filePath => {
     const parsed = yaml.load(fs.readFileSync(filePath, 'utf8'));
     const title = parsed?.title;
@@ -79,11 +81,14 @@ function loadTechnologyMap() {
       throw new Error(`Invalid technology file: ${filePath}`);
     }
 
-    return [title, {
-      id: path.basename(filePath, '.yml'),
+    return [
       title,
-      iconImageUrl: `/technologies/${iconImage}`
-    }];
+      {
+        id: path.basename(filePath, '.yml'),
+        title,
+        iconImageUrl: `/technologies/${iconImage}`,
+      },
+    ];
   });
 
   return new Map(entries);
@@ -106,7 +111,7 @@ function parseWorkFile(filePath) {
       return {
         id: technologyName.toLowerCase().replace(/\s+/g, '-'),
         title: technologyName,
-        iconImageUrl: ''
+        iconImageUrl: '',
       };
     }
 
@@ -126,7 +131,7 @@ function parseWorkFile(filePath) {
     style: frontmatter.style,
     technologies,
     body: content,
-    absoluteFilePath: filePath
+    absoluteFilePath: filePath,
   };
 
   return project;
@@ -160,7 +165,10 @@ export function getWorkProjectBySlug(slugSegments) {
   }
 
   const requestedPath = normalizePath(`/work/${slugSegments.join('/')}`);
-  return allWorkProjects.find(project => project.normalizedPath === requestedPath) ?? null;
+  return (
+    allWorkProjects.find(project => project.normalizedPath === requestedPath) ??
+    null
+  );
 }
 
 export function getAllWorkParams() {

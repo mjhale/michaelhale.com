@@ -4,7 +4,10 @@ import TechnologyIconList from '@/src/components/technology-icon-list';
 
 export default function ProjectCard({ project }) {
   return (
-    <AppLink className="group block h-full overflow-hidden rounded-md" href={project.routePath}>
+    <AppLink
+      className="group block h-full overflow-hidden rounded-md"
+      href={project.routePath}
+    >
       <div className="relative min-h-[275px]">
         <Image
           alt={project.title}

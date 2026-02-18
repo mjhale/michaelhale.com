@@ -5,7 +5,7 @@ const contactSchema = z.object({
   name: z.string().min(1),
   email: z.email(),
   message: z.string().min(1),
-  company: z.string().optional().default('')
+  company: z.string().optional().default(''),
 });
 
 function envValue(name) {
@@ -27,7 +27,7 @@ function buildTransporter() {
     host,
     port,
     secure: envValue('SMTP_SECURE') === 'true',
-    auth: { user, pass }
+    auth: { user, pass },
   });
 }
 
@@ -38,7 +38,11 @@ export async function POST(request) {
 
     if (!result.success) {
       return Response.json(
-        { ok: false, errors: result.error.flatten().fieldErrors, message: 'Invalid payload.' },
+        {
+          ok: false,
+          errors: result.error.flatten().fieldErrors,
+          message: 'Invalid payload.',
+        },
         { status: 400 }
       );
     }
@@ -51,7 +55,10 @@ export async function POST(request) {
 
     if (!transporter) {
       return Response.json(
-        { ok: false, message: 'Email service is not configured on this server.' },
+        {
+          ok: false,
+          message: 'Email service is not configured on this server.',
+        },
         { status: 500 }
       );
     }
@@ -71,7 +78,7 @@ export async function POST(request) {
       to,
       subject: `Portfolio contact request from ${result.data.name}`,
       text: `Name: ${result.data.name}\nEmail: ${result.data.email}\n\n${result.data.message}`,
-      replyTo: result.data.email
+      replyTo: result.data.email,
     });
 
     return Response.json({ ok: true }, { status: 200 });

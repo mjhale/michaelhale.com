@@ -9,7 +9,7 @@ const inter = Inter({
   subsets: ['latin'],
   weight: ['400', '600', '700'],
   variable: '--font-sans-next',
-  display: 'swap'
+  display: 'swap',
 });
 
 // Include both italic and normal
@@ -18,31 +18,34 @@ const playfairDisplay = Playfair_Display({
   weight: ['700'],
   style: ['normal', 'italic'],
   variable: '--font-serif-next',
-  display: 'swap'
+  display: 'swap',
 });
 
 const abrilFatface = Abril_Fatface({
   subsets: ['latin'],
   weight: '400',
   variable: '--font-display-next',
-  display: 'swap'
+  display: 'swap',
 });
 
 export const metadata = {
   metadataBase: new URL(site.siteUrl),
   title: {
     default: site.title,
-    template: `%s | ${site.title}`
+    template: `%s | ${site.title}`,
   },
   description: site.description,
   icons: {
-    icon: '/images/portfolio-icon.png'
-  }
+    icon: '/images/portfolio-icon.png',
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html className={`${inter.variable} ${playfairDisplay.variable} ${abrilFatface.variable}`} lang="en">
+    <html
+      className={`${inter.variable} ${playfairDisplay.variable} ${abrilFatface.variable}`}
+      lang="en"
+    >
       <body className={inter.className}>
         <SkipLink />
         <Header />

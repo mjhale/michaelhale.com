@@ -6,7 +6,7 @@ import AppLink from '@/src/components/app-link';
 
 const navLinks = [
   { href: '/work/', label: 'Work' },
-  { href: '/contact/', label: 'Contact' }
+  { href: '/contact/', label: 'Contact' },
 ];
 
 export default function Nav() {
@@ -116,7 +116,9 @@ export default function Nav() {
         aria-hidden={!open}
         className={clsx(
           'fixed inset-x-0 bottom-0 top-[5.75rem] z-20 bg-brand-cream/95 backdrop-brightness-60 transition md:hidden motion-reduce:transition-none',
-          open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+          open
+            ? 'pointer-events-auto opacity-100'
+            : 'pointer-events-none opacity-0'
         )}
         onClick={() => {
           setOpen(false);
@@ -140,7 +142,10 @@ export default function Nav() {
         role={open ? 'dialog' : undefined}
       >
         {navLinks.map(link => (
-          <li className="border-b border-brand-cream/30 py-2 last:border-b-0 md:border-none md:p-0" key={link.href}>
+          <li
+            className="border-b border-brand-cream/30 py-2 last:border-b-0 md:border-none md:p-0"
+            key={link.href}
+          >
             <AppLink
               className="block rounded px-3 py-3 text-base lowercase tracking-[0.1em] text-brand-cream transition hover:bg-[var(--page-header-bg)]/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-cream md:px-0 md:py-0 md:text-sm"
               href={link.href}

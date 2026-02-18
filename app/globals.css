@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @plugin "@tailwindcss/typography";
 
 @theme {
@@ -16,11 +16,13 @@
   --color-brand-ink: hsl(0 0% 16%);
   --color-brand-muted: hsl(0 0% 46%);
 
-  --font-sans: var(--font-sans-next), "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-sans:
+    var(--font-sans-next), 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   --font-serif: var(--font-serif-next), Georgia, serif;
-  --font-display: var(--font-display-next), "Times New Roman", serif;
+  --font-display: var(--font-display-next), 'Times New Roman', serif;
 
-  --shadow-screenshot: 0 0.5vw 2.5vw rgba(0, 0, 0, 0.35), 0 2vw 4.75vw 1.25vw rgba(0, 0, 0, 0.18);
+  --shadow-screenshot:
+    0 0.5vw 2.5vw rgba(0, 0, 0, 0.35), 0 2vw 4.75vw 1.25vw rgba(0, 0, 0, 0.18);
 }
 
 :root {
