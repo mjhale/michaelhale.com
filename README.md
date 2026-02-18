@@ -1,12 +1,12 @@
 # MichaelHale.xyz
 
-Portfolio site migrated from Gatsby to self-hosted Next.js App Router with Tailwind CSS.
+A personal portfolio website that showcases featured projects, technical skills, and more.
 
 ## Stack
 
 - Next.js App Router
 - React 19
-- Tailwind CSS + Typography plugin
+- Tailwind CSS
 - MDX content from `content/work`
 - YAML technology metadata from `content/technologies`
 - Dockerized production runtime
@@ -14,8 +14,8 @@ Portfolio site migrated from Gatsby to self-hosted Next.js App Router with Tailw
 ## Setup
 
 ```bash
-git clone git@github.com:mjhale/portfolio.git
-cd portfolio
+git clone git@github.com:mjhale/michaelhale.xyz.git
+cd michaelhale.xyz
 npm install
 npm run dev
 ```
@@ -69,16 +69,21 @@ Copy `.env.example` values into your deployment environment:
 - `SMTP_USER`
 - `SMTP_PASS`
 
-## Docker
+## Deployment
 
-Build and run:
+The application is containerized using Docker and supports multi-platform builds:
 
 ```bash
-docker build -t michaelhale-portfolio .
-docker run --rm -p 3000:3000 --env-file .env michaelhale-portfolio
+# Build for multiple platforms with dynamic git commit tag
+docker buildx build --no-cache --platform linux/amd64,linux/arm64 \
+  -t ghcr.io/mjhale/michaelhale.xyz:latest \
+  -t ghcr.io/mjhale/michaelhale.xyz:$(git rev-parse HEAD) .
+
+# Push both tags
+docker push ghcr.io/mjhale/michaelhale.xyz:latest
+docker push ghcr.io/mjhale/michaelhale.xyz:$(git rev-parse HEAD)
+
+# Run container
+docker run -d -p 3000:3000 --env-file .env \
+  --name michaelhale.xyz ghcr.io/mjhale/michaelhale.xyz:latest
 ```
-
-## Notes
-
-- Segment and Sentry integrations were intentionally removed.
-- `styled-components` was removed and replaced with Tailwind utility classes.
