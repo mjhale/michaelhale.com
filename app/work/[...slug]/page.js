@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { MDXRemote } from 'next-mdx-remote/rsc';
 import TechnologyIconList from '@/src/components/technology-icon-list';
 import { getAllWorkParams, getWorkProjectBySlug } from '@/src/lib/content';
+import { getImageManifest } from '@/src/lib/image-manifest';
 import { getMdxComponents } from '@/src/components/mdx-components';
 
 export function generateStaticParams() {
@@ -14,19 +15,20 @@ export async function generateMetadata({ params }) {
 
   if (!project) {
     return {
-      title: 'Project Not Found'
+      title: 'Project Not Found',
     };
   }
 
   return {
     title: project.title,
-    description: project.summary
+    description: project.summary,
   };
 }
 
 export default async function WorkDetailPage({ params }) {
   const { slug = [] } = await params;
   const project = getWorkProjectBySlug(slug);
+  const imageManifest = getImageManifest();
 
   if (!project) {
     notFound();
@@ -52,8 +54,10 @@ export default async function WorkDetailPage({ params }) {
         <MDXRemote
           components={getMdxComponents({
             backgroundImage: '/images/fractal-noise.svg',
+            imageManifest,
             offsetColor: project.style.screenshot_offset,
-            shadowColor: project.style.screenshot_shadow
+            routePath: project.routePath,
+            shadowColor: project.style.screenshot_shadow,
           })}
           source={project.body}
         />

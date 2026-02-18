@@ -1,12 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
+import { imageSize } from 'image-size';
 
 const root = process.cwd();
 const publicDir = path.join(root, 'public');
 const workDir = path.join(root, 'content', 'work');
 const technologyDir = path.join(root, 'content', 'technologies');
 const assetsImageDir = path.join(root, 'assets', 'images');
+const generatedDir = path.join(publicDir, 'generated');
+const imageManifest = {};
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -47,6 +50,36 @@ function normalizeWorkPath(rawPath) {
   }
 
   return normalized;
+}
+
+function normalizePublicPath(filePath) {
+  const normalized = filePath.split(path.sep).join('/');
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
+
+function registerImageMetadata(publicPath, sourcePath) {
+  const extension = path.extname(sourcePath).toLowerCase();
+  const imageExtensions = new Set(['.png', '.jpg', '.jpeg', '.webp', '.avif', '.gif', '.svg']);
+
+  if (!imageExtensions.has(extension)) {
+    return;
+  }
+
+  try {
+    const fileBuffer = fs.readFileSync(sourcePath);
+    const size = imageSize(fileBuffer);
+
+    if (!size?.width || !size?.height) {
+      return;
+    }
+
+    imageManifest[publicPath] = {
+      width: size.width,
+      height: size.height
+    };
+  } catch (_error) {
+    // Skip files that cannot be measured.
+  }
 }
 
 function syncTechnologyAssets() {
@@ -92,12 +125,21 @@ function syncWorkAssets() {
       .filter(fileName => !fileName.endsWith('.mdx') && !fileName.startsWith('.'));
 
     for (const assetFileName of assets) {
-      fs.copyFileSync(path.join(sourceDir, assetFileName), path.join(outputDir, assetFileName));
+      const sourceFilePath = path.join(sourceDir, assetFileName);
+      const outputFilePath = path.join(outputDir, assetFileName);
+      fs.copyFileSync(sourceFilePath, outputFilePath);
+      registerImageMetadata(normalizePublicPath(path.join(routePath, assetFileName)), sourceFilePath);
     }
   }
+}
+
+function writeImageManifest() {
+  ensureDir(generatedDir);
+  fs.writeFileSync(path.join(generatedDir, 'image-manifest.json'), JSON.stringify(imageManifest, null, 2));
 }
 
 cleanDir(publicDir);
 syncTechnologyAssets();
 syncImageAssets();
 syncWorkAssets();
+writeImageManifest();
