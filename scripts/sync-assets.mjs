@@ -13,11 +13,15 @@ const generatedDir = path.join(publicDir, 'generated');
 const manifestPath = path.join(generatedDir, 'image-manifest.json');
 const imageManifest = {};
 const expectedPublicFiles = new Set();
+const imageSyncStats = {
+  reused: 0,
+  regenerated: 0
+};
 const scriptStart = Date.now();
 
 const GENERATOR_VERSION = 1;
 const RESPONSIVE_WIDTHS = [480, 768, 1024, 1440, 1920];
-let sharpModule = null;
+let sharpModule;
 let previousImageManifest = {};
 
 function ensureDir(dirPath) {
@@ -298,11 +302,12 @@ function readWorkEntry(mdxFilePath) {
 function getWorkAssetFileNames(sourceDir) {
   return fs
     .readdirSync(sourceDir)
-    .filter(fileName => !fileName.endsWith('.mdx') && !fileName.startsWith('.'));
+    .filter(fileName => !fileName.endsWith('.mdx') && !fileName.startsWith('.'))
+    .sort();
 }
 
 async function getSharpModule() {
-  if (sharpModule) {
+  if (sharpModule !== undefined) {
     return sharpModule;
   }
 
@@ -311,7 +316,8 @@ async function getSharpModule() {
     sharpModule = imported.default;
     return sharpModule;
   } catch (_error) {
-    return null;
+    sharpModule = null;
+    return sharpModule;
   }
 }
 
@@ -323,11 +329,10 @@ function sizeForWidth(originalWidth, originalHeight, width) {
   };
 }
 
-async function generateResponsiveVariants(sourcePath, outputDir, routePath, fileName, originalSize) {
-  const sharp = await getSharpModule();
+function getResponsiveVariantPlan(routePath, fileName, originalSize, canGenerateVariants) {
   const extension = path.extname(fileName).toLowerCase();
 
-  if (!sharp || !shouldGenerateVariants(extension)) {
+  if (!canGenerateVariants) {
     return {
       webp: [],
       fallback: []
@@ -341,16 +346,48 @@ async function generateResponsiveVariants(sourcePath, outputDir, routePath, file
     fallback: []
   };
 
+  for (const width of widths) {
+    const resized = sizeForWidth(originalSize.width, originalSize.height, width);
+
+    const fallbackName = `${baseName}-${width}${extension}`;
+    const fallbackPublicPath = normalizePublicPath(path.join(routePath, fallbackName));
+    const webpName = `${baseName}-${width}.webp`;
+    const webpPublicPath = normalizePublicPath(path.join(routePath, webpName));
+
+    variants.fallback.push({
+      src: fallbackPublicPath,
+      width: resized.width,
+      height: resized.height
+    });
+
+    variants.webp.push({
+      src: webpPublicPath,
+      width: resized.width,
+      height: resized.height
+    });
+  }
+
+  return variants;
+}
+
+async function generateResponsiveVariants(sourcePath, outputDir, routePath, fileName, originalSize) {
+  const sharp = await getSharpModule();
+  const extension = path.extname(fileName).toLowerCase();
+
+  if (!sharp || !shouldGenerateVariants(extension)) {
+    return;
+  }
+
+  const baseName = path.basename(fileName, extension);
+  const widths = RESPONSIVE_WIDTHS.filter(width => width < originalSize.width);
+
   if (widths.length > 0) {
     logStep(`Generating ${widths.length} responsive variant(s) for ${normalizePublicPath(path.join(routePath, fileName))}`);
   }
 
   for (const width of widths) {
-    const resized = sizeForWidth(originalSize.width, originalSize.height, width);
-
     const fallbackName = `${baseName}-${width}${extension}`;
     const fallbackOutputPath = path.join(outputDir, fallbackName);
-    const fallbackPublicPath = normalizePublicPath(path.join(routePath, fallbackName));
 
     let fallbackPipeline = sharp(sourcePath).resize({ width, withoutEnlargement: true });
 
@@ -363,30 +400,15 @@ async function generateResponsiveVariants(sourcePath, outputDir, routePath, file
     prepareOutputFile(fallbackOutputPath);
     await fallbackPipeline.toFile(fallbackOutputPath);
 
-    variants.fallback.push({
-      src: fallbackPublicPath,
-      width: resized.width,
-      height: resized.height
-    });
-
     const webpName = `${baseName}-${width}.webp`;
     const webpOutputPath = path.join(outputDir, webpName);
-    const webpPublicPath = normalizePublicPath(path.join(routePath, webpName));
 
     prepareOutputFile(webpOutputPath);
     await sharp(sourcePath)
       .resize({ width, withoutEnlargement: true })
       .webp({ quality: 78 })
       .toFile(webpOutputPath);
-
-    variants.webp.push({
-      src: webpPublicPath,
-      width: resized.width,
-      height: resized.height
-    });
   }
-
-  return variants;
 }
 
 async function registerImageMetadata(publicPath, sourcePath, outputDir, routePath, fileName) {
@@ -406,10 +428,13 @@ async function registerImageMetadata(publicPath, sourcePath, outputDir, routePat
       return;
     }
 
-    const variants = await generateResponsiveVariants(sourcePath, outputDir, routePath, fileName, {
+    const originalSize = {
       width: size.width,
       height: size.height
-    });
+    };
+    const sharp = await getSharpModule();
+    const canGenerateVariants = Boolean(sharp) && shouldGenerateVariants(extension);
+    const variants = getResponsiveVariantPlan(routePath, fileName, originalSize, canGenerateVariants);
     const reusableEntry = getReusableImageEntry(
       previousImageManifest[publicPath],
       size,
@@ -418,6 +443,13 @@ async function registerImageMetadata(publicPath, sourcePath, outputDir, routePat
       publicPathToFilePath(publicPath)
     );
     const manifestEntry = reusableEntry || createImageManifestEntry(size, variants, sourceHash);
+
+    if (reusableEntry) {
+      imageSyncStats.reused += 1;
+    } else {
+      imageSyncStats.regenerated += 1;
+      await generateResponsiveVariants(sourcePath, outputDir, routePath, fileName, originalSize);
+    }
 
     markImageVariantOutputs(manifestEntry.variants);
     imageManifest[publicPath] = manifestEntry;
@@ -432,7 +464,8 @@ function syncTechnologyAssets() {
 
   const files = fs
     .readdirSync(technologyDir)
-    .filter(fileName => fileName.endsWith('.svg'));
+    .filter(fileName => fileName.endsWith('.svg'))
+    .sort();
 
   for (const fileName of files) {
     const outputFilePath = path.join(outDir, fileName);
@@ -449,7 +482,8 @@ function syncImageAssets() {
 
   const files = fs
     .readdirSync(assetsImageDir)
-    .filter(fileName => !fileName.startsWith('.'));
+    .filter(fileName => !fileName.startsWith('.'))
+    .sort();
 
   for (const fileName of files) {
     const outputFilePath = path.join(outDir, fileName);
@@ -477,7 +511,9 @@ async function syncWorkAsset(workEntry, assetFileName) {
 }
 
 async function syncWorkAssets() {
-  const mdxFiles = walk(workDir).filter(filePath => filePath.endsWith('.mdx'));
+  const mdxFiles = walk(workDir)
+    .filter(filePath => filePath.endsWith('.mdx'))
+    .sort();
   let copiedAssetCount = 0;
 
   for (const [index, mdxFilePath] of mdxFiles.entries()) {
@@ -519,6 +555,9 @@ async function syncAssets() {
   logStep('Syncing work entry assets');
   const { mdxCount, copiedAssetCount } = await syncWorkAssets();
   logStep(`Processed ${mdxCount} work file(s) and copied ${copiedAssetCount} work asset(s)`);
+  logStep(
+    `Reused ${imageSyncStats.reused} image manifest entries; regenerated ${imageSyncStats.regenerated} image manifest entries`
+  );
 
   logStep('Writing image manifest');
   writeImageManifest();
