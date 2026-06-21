@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import matter from 'gray-matter';
-import yaml from 'js-yaml';
+import { load as loadYaml } from 'js-yaml';
 import { z } from 'zod';
+import { parseFrontmatter } from '@/src/lib/frontmatter.mjs';
 
 const root = process.cwd();
 const workDir = path.join(root, 'content', 'work');
@@ -73,7 +73,7 @@ function loadTechnologyMap() {
     filePath.endsWith('.yml')
   );
   const entries = technologyFiles.map(filePath => {
-    const parsed = yaml.load(fs.readFileSync(filePath, 'utf8'));
+    const parsed = loadYaml(fs.readFileSync(filePath, 'utf8'));
     const title = parsed?.title;
     const iconImage = parsed?.iconImage;
 
@@ -98,7 +98,7 @@ const technologyMap = loadTechnologyMap();
 
 function parseWorkFile(filePath) {
   const raw = fs.readFileSync(filePath, 'utf8');
-  const { data, content } = matter(raw);
+  const { data, content } = parseFrontmatter(raw, filePath);
   const frontmatter = frontmatterSchema.parse(data);
   const normalizedPath = normalizePath(frontmatter.path);
   const routePath = trailingPath(normalizedPath);

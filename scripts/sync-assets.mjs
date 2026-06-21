@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import matter from 'gray-matter';
 import { imageSize } from 'image-size';
+import { parseFrontmatter } from '../src/lib/frontmatter.mjs';
 
 const root = process.cwd();
 const publicDir = path.join(root, 'public');
@@ -223,7 +223,7 @@ async function syncWorkAssets() {
   for (const [index, mdxFilePath] of mdxFiles.entries()) {
     const sourceDir = path.dirname(mdxFilePath);
     const source = fs.readFileSync(mdxFilePath, 'utf8');
-    const parsed = matter(source);
+    const parsed = parseFrontmatter(source, mdxFilePath);
     const routePath = normalizeWorkPath(parsed.data.path || '');
 
     if (!routePath.startsWith('/work/')) {
