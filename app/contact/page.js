@@ -13,8 +13,8 @@ export default function ContactPage() {
       <div className="mt-4 min-h-52 max-w-2xl">
         Whether you are interested in working together or just want to say
         hello, reach out to{' '}
-        <AppLink className="underline" href="mailto:mail@michaelhale.xyz">
-          mail@michaelhale.xyz
+        <AppLink className="underline" href="mailto:mail@michaelhale.com">
+          mail@michaelhale.com
         </AppLink>{' '}
         at any time.
       </div>

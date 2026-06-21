@@ -21,8 +21,8 @@ export default function AboutPage() {
       </p>
       <p>
         For consulting opportunities or recruiting inquiries, reach out to{' '}
-        <AppLink className="underline" href="mailto:mail@michaelhale.xyz">
-          mail@michaelhale.xyz
+        <AppLink className="underline" href="mailto:mail@michaelhale.com">
+          mail@michaelhale.com
         </AppLink>
         .
       </p>

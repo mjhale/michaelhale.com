@@ -1,6 +1,6 @@
-# MichaelHale.xyz
+# Michael Hale's Website
 
-A personal portfolio website that showcases featured projects, technical skills, and more.
+A website for Michael Hale that showcases featured projects, technical skills, and more.
 
 ## Stack
 
@@ -14,8 +14,8 @@ A personal portfolio website that showcases featured projects, technical skills,
 ## Setup
 
 ```bash
-git clone git@github.com:mjhale/michaelhale.xyz.git
-cd michaelhale.xyz
+git clone git@github.com:mjhale/michaelhale.com.git
+cd michaelhale.com
 corepack enable
 pnpm install
 pnpm dev
@@ -50,19 +50,19 @@ The application is containerized using Podman and supports multi-platform builds
 # Build for multiple platforms with dynamic git commit tag
 podman build --no-cache \
   --platform linux/amd64,linux/arm64 \
-  --manifest ghcr.io/mjhale/michaelhale.xyz:latest .
+  --manifest ghcr.io/mjhale/michaelhale.com:latest .
 
 # Push latest
 podman manifest push --all \
-  ghcr.io/mjhale/michaelhale.xyz:latest \
-  docker://ghcr.io/mjhale/michaelhale.xyz:latest
+  ghcr.io/mjhale/michaelhale.com:latest \
+  docker://ghcr.io/mjhale/michaelhale.com:latest
 
 # Push git commit tag
 podman manifest push --all \
-  ghcr.io/mjhale/michaelhale.xyz:latest \
-  docker://ghcr.io/mjhale/michaelhale.xyz:$(git rev-parse HEAD)
+  ghcr.io/mjhale/michaelhale.com:latest \
+  docker://ghcr.io/mjhale/michaelhale.com:$(git rev-parse HEAD)
 
 # Run container
 podman run -d -p 3000:3000 --env-file .env \
-  --name michaelhale.xyz ghcr.io/mjhale/michaelhale.xyz:latest
+  --name michaelhale.com ghcr.io/mjhale/michaelhale.com:latest
 ```
