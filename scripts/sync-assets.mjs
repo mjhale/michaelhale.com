@@ -20,6 +20,7 @@ const imageSyncStats = {
 const scriptStart = Date.now();
 
 const GENERATOR_VERSION = 1;
+const DEFAULT_CONCURRENCY = 4;
 const RESPONSIVE_WIDTHS = [480, 768, 1024, 1440, 1920];
 let sharpModule;
 let previousImageManifest = {};
@@ -41,7 +42,21 @@ function ensureDir(dirPath) {
     ensureDir(parentDir);
   }
 
-  fs.mkdirSync(resolvedPath);
+  try {
+    fs.mkdirSync(resolvedPath);
+  } catch (error) {
+    if (error?.code === 'EEXIST' && fs.existsSync(resolvedPath)) {
+      if (fs.lstatSync(resolvedPath).isDirectory()) {
+        return;
+      }
+
+      fs.rmSync(resolvedPath, { recursive: true, force: true });
+      fs.mkdirSync(resolvedPath);
+      return;
+    }
+
+    throw error;
+  }
 }
 
 function walk(dirPath) {
@@ -96,6 +111,28 @@ function shouldGenerateVariants(extension) {
 
 function logStep(message) {
   console.log(`[sync-assets] ${message}`);
+}
+
+function getSyncAssetsConcurrency() {
+  const parsed = Number(process.env.SYNC_ASSETS_CONCURRENCY || '');
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : DEFAULT_CONCURRENCY;
+}
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workerCount }, worker));
+  return results;
 }
 
 function markExpectedPublicFile(filePath) {
@@ -452,10 +489,13 @@ async function registerImageMetadata(publicPath, sourcePath, outputDir, routePat
     }
 
     markImageVariantOutputs(manifestEntry.variants);
-    imageManifest[publicPath] = manifestEntry;
+
+    return [publicPath, manifestEntry];
   } catch (_error) {
     // Skip files that cannot be measured.
   }
+
+  return null;
 }
 
 function syncTechnologyAssets() {
@@ -501,7 +541,7 @@ async function syncWorkAsset(workEntry, assetFileName) {
   copyPublicFile(sourceFilePath, outputFilePath);
   markExpectedPublicFile(outputFilePath);
 
-  await registerImageMetadata(
+  return registerImageMetadata(
     normalizePublicPath(path.join(workEntry.routePath, assetFileName)),
     sourceFilePath,
     workEntry.outputDir,
@@ -511,10 +551,12 @@ async function syncWorkAsset(workEntry, assetFileName) {
 }
 
 async function syncWorkAssets() {
+  const concurrency = getSyncAssetsConcurrency();
   const mdxFiles = walk(workDir)
     .filter(filePath => filePath.endsWith('.mdx'))
     .sort();
   let copiedAssetCount = 0;
+  const assetTasks = [];
 
   for (const [index, mdxFilePath] of mdxFiles.entries()) {
     const workEntry = readWorkEntry(mdxFilePath);
@@ -522,9 +564,26 @@ async function syncWorkAssets() {
     logStep(`Syncing work assets (${index + 1}/${mdxFiles.length}): ${workEntry.routePath}`);
 
     for (const assetFileName of getWorkAssetFileNames(workEntry.sourceDir)) {
-      await syncWorkAsset(workEntry, assetFileName);
+      assetTasks.push({
+        workEntry,
+        assetFileName
+      });
       copiedAssetCount += 1;
     }
+  }
+
+  logStep(`Processing ${assetTasks.length} work asset(s) with concurrency ${concurrency}`);
+  const imageEntries = await mapWithConcurrency(assetTasks, concurrency, task =>
+    syncWorkAsset(task.workEntry, task.assetFileName)
+  );
+
+  for (const imageEntry of imageEntries) {
+    if (!imageEntry) {
+      continue;
+    }
+
+    const [publicPath, manifestEntry] = imageEntry;
+    imageManifest[publicPath] = manifestEntry;
   }
 
   return {
