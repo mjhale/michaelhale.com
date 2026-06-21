@@ -44,19 +44,25 @@ Copy `.env.example` values into your deployment environment:
 
 ## Deployment
 
-The application is containerized using Docker and supports multi-platform builds:
+The application is containerized using Podman and supports multi-platform builds:
 
 ```bash
 # Build for multiple platforms with dynamic git commit tag
-docker buildx build --no-cache --platform linux/amd64,linux/arm64 \
-  -t ghcr.io/mjhale/michaelhale.xyz:latest \
-  -t ghcr.io/mjhale/michaelhale.xyz:$(git rev-parse HEAD) .
+podman build --no-cache \
+  --platform linux/amd64,linux/arm64 \
+  --manifest ghcr.io/mjhale/michaelhale.xyz:latest .
 
-# Push both tags
-docker push ghcr.io/mjhale/michaelhale.xyz:latest
-docker push ghcr.io/mjhale/michaelhale.xyz:$(git rev-parse HEAD)
+# Push latest
+podman manifest push --all \
+  ghcr.io/mjhale/michaelhale.xyz:latest \
+  docker://ghcr.io/mjhale/michaelhale.xyz:latest
+
+# Push git commit tag
+podman manifest push --all \
+  ghcr.io/mjhale/michaelhale.xyz:latest \
+  docker://ghcr.io/mjhale/michaelhale.xyz:$(git rev-parse HEAD)
 
 # Run container
-docker run -d -p 3000:3000 --env-file .env \
+podman run -d -p 3000:3000 --env-file .env \
   --name michaelhale.xyz ghcr.io/mjhale/michaelhale.xyz:latest
 ```
