@@ -44,12 +44,16 @@ Copy `.env.example` values into your deployment environment:
 
 ## Deployment
 
-The application is containerized using Podman and supports multi-platform builds:
+The application is containerized using Podman and supports multi-platform builds.
+For normal builds, avoid `--no-cache` so Podman can reuse build layers. Pre-generating
+assets before a multi-platform build keeps the expensive image sync work warm:
 
 ```bash
-# Build for multiple platforms with dynamic git commit tag
-podman build --no-cache \
-  --platform linux/amd64,linux/arm64 \
+# Pre-generate public assets
+pnpm prebuild
+
+# Build for multiple platforms
+podman build --platform linux/amd64,linux/arm64 \
   --manifest ghcr.io/mjhale/michaelhale.com:latest .
 
 # Push latest
@@ -66,3 +70,6 @@ podman manifest push --all \
 podman run -d -p 3000:3000 --env-file .env \
   --name michaelhale.com ghcr.io/mjhale/michaelhale.com:latest
 ```
+
+Asset sync uses `SYNC_ASSETS_CONCURRENCY=4` by default. Tune that value for your
+machine if image generation competes too heavily with other work.
