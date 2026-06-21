@@ -9,19 +9,32 @@ const workDir = path.join(root, 'content', 'work');
 const technologyDir = path.join(root, 'content', 'technologies');
 const assetsImageDir = path.join(root, 'assets', 'images');
 const generatedDir = path.join(publicDir, 'generated');
+const manifestPath = path.join(generatedDir, 'image-manifest.json');
 const imageManifest = {};
+const expectedPublicFiles = new Set();
 const scriptStart = Date.now();
 
 const RESPONSIVE_WIDTHS = [480, 768, 1024, 1440, 1920];
 let sharpModule = null;
 
 function ensureDir(dirPath) {
-  fs.mkdirSync(dirPath, { recursive: true });
-}
+  const resolvedPath = path.resolve(dirPath);
 
-function cleanDir(dirPath) {
-  fs.rmSync(dirPath, { recursive: true, force: true });
-  ensureDir(dirPath);
+  if (fs.existsSync(resolvedPath)) {
+    if (fs.lstatSync(resolvedPath).isDirectory()) {
+      return;
+    }
+
+    fs.rmSync(resolvedPath, { recursive: true, force: true });
+  }
+
+  const parentDir = path.dirname(resolvedPath);
+
+  if (parentDir !== resolvedPath) {
+    ensureDir(parentDir);
+  }
+
+  fs.mkdirSync(resolvedPath);
 }
 
 function walk(dirPath) {
@@ -61,6 +74,11 @@ function normalizePublicPath(filePath) {
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
+function publicPathToFilePath(publicPath) {
+  const relativePath = publicPath.startsWith('/') ? publicPath.slice(1) : publicPath;
+  return path.join(publicDir, relativePath.split('/').join(path.sep));
+}
+
 function shouldGenerateVariants(extension) {
   return ['.png', '.jpg', '.jpeg'].includes(extension);
 }
@@ -69,9 +87,85 @@ function logStep(message) {
   console.log(`[sync-assets] ${message}`);
 }
 
+function markExpectedPublicFile(filePath) {
+  expectedPublicFiles.add(path.resolve(filePath));
+}
+
+function markExpectedPublicPath(publicPath) {
+  markExpectedPublicFile(publicPathToFilePath(publicPath));
+}
+
+function markImageVariantOutputs(variants) {
+  for (const variant of [...variants.webp, ...variants.fallback]) {
+    markExpectedPublicPath(variant.src);
+  }
+}
+
+function prepareOutputFile(filePath) {
+  ensureDir(path.dirname(filePath));
+
+  if (fs.existsSync(filePath) && fs.lstatSync(filePath).isDirectory()) {
+    fs.rmSync(filePath, { recursive: true, force: true });
+  }
+}
+
+function copyPublicFile(sourcePath, outputPath) {
+  prepareOutputFile(outputPath);
+  fs.copyFileSync(sourcePath, outputPath);
+}
+
 function preparePublicDirectory() {
-  logStep('Cleaning public directory');
-  cleanDir(publicDir);
+  logStep('Preparing public directory');
+  ensureDir(publicDir);
+}
+
+function removeStaleEntriesInDir(dirPath, totals) {
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const resolvedPath = path.join(dirPath, entry.name);
+
+    if (entry.isDirectory()) {
+      removeStaleEntriesInDir(resolvedPath, totals);
+
+      if (fs.readdirSync(resolvedPath).length === 0) {
+        fs.rmdirSync(resolvedPath);
+        totals.directories += 1;
+      }
+
+      continue;
+    }
+
+    if (expectedPublicFiles.has(path.resolve(resolvedPath))) {
+      continue;
+    }
+
+    fs.rmSync(resolvedPath, { force: true });
+    totals.files += 1;
+  }
+}
+
+function removeStalePublicEntries() {
+  const controlledDirs = [
+    path.join(publicDir, 'technologies'),
+    path.join(publicDir, 'images'),
+    path.join(publicDir, 'work'),
+    generatedDir
+  ];
+  const totals = {
+    files: 0,
+    directories: 0
+  };
+
+  for (const controlledDir of controlledDirs) {
+    if (!fs.existsSync(controlledDir)) {
+      continue;
+    }
+
+    removeStaleEntriesInDir(controlledDir, totals);
+  }
+
+  return totals;
 }
 
 function readWorkEntry(mdxFilePath) {
@@ -157,6 +251,7 @@ async function generateResponsiveVariants(sourcePath, outputDir, routePath, file
       fallbackPipeline = fallbackPipeline.jpeg({ quality: 80, mozjpeg: true });
     }
 
+    prepareOutputFile(fallbackOutputPath);
     await fallbackPipeline.toFile(fallbackOutputPath);
 
     variants.fallback.push({
@@ -169,6 +264,7 @@ async function generateResponsiveVariants(sourcePath, outputDir, routePath, file
     const webpOutputPath = path.join(outputDir, webpName);
     const webpPublicPath = normalizePublicPath(path.join(routePath, webpName));
 
+    prepareOutputFile(webpOutputPath);
     await sharp(sourcePath)
       .resize({ width, withoutEnlargement: true })
       .webp({ quality: 78 })
@@ -205,6 +301,8 @@ async function registerImageMetadata(publicPath, sourcePath, outputDir, routePat
       height: size.height
     });
 
+    markImageVariantOutputs(variants);
+
     imageManifest[publicPath] = {
       width: size.width,
       height: size.height,
@@ -224,7 +322,9 @@ function syncTechnologyAssets() {
     .filter(fileName => fileName.endsWith('.svg'));
 
   for (const fileName of files) {
-    fs.copyFileSync(path.join(technologyDir, fileName), path.join(outDir, fileName));
+    const outputFilePath = path.join(outDir, fileName);
+    copyPublicFile(path.join(technologyDir, fileName), outputFilePath);
+    markExpectedPublicFile(outputFilePath);
   }
 
   return files.length;
@@ -239,7 +339,9 @@ function syncImageAssets() {
     .filter(fileName => !fileName.startsWith('.'));
 
   for (const fileName of files) {
-    fs.copyFileSync(path.join(assetsImageDir, fileName), path.join(outDir, fileName));
+    const outputFilePath = path.join(outDir, fileName);
+    copyPublicFile(path.join(assetsImageDir, fileName), outputFilePath);
+    markExpectedPublicFile(outputFilePath);
   }
 
   return files.length;
@@ -249,7 +351,8 @@ async function syncWorkAsset(workEntry, assetFileName) {
   const sourceFilePath = path.join(workEntry.sourceDir, assetFileName);
   const outputFilePath = path.join(workEntry.outputDir, assetFileName);
 
-  fs.copyFileSync(sourceFilePath, outputFilePath);
+  copyPublicFile(sourceFilePath, outputFilePath);
+  markExpectedPublicFile(outputFilePath);
 
   await registerImageMetadata(
     normalizePublicPath(path.join(workEntry.routePath, assetFileName)),
@@ -283,10 +386,8 @@ async function syncWorkAssets() {
 
 function writeImageManifest() {
   ensureDir(generatedDir);
-  fs.writeFileSync(
-    path.join(generatedDir, 'image-manifest.json'),
-    JSON.stringify(imageManifest, null, 2)
-  );
+  markExpectedPublicFile(manifestPath);
+  fs.writeFileSync(manifestPath, JSON.stringify(imageManifest, null, 2));
 }
 
 async function syncAssets() {
@@ -307,6 +408,13 @@ async function syncAssets() {
 
   logStep('Writing image manifest');
   writeImageManifest();
+
+  logStep('Removing stale public asset files');
+  const staleEntryCounts = removeStalePublicEntries();
+  const directoryLabel = staleEntryCounts.directories === 1 ? 'directory' : 'directories';
+  logStep(
+    `Removed ${staleEntryCounts.files} stale public asset file(s) and ${staleEntryCounts.directories} empty public ${directoryLabel}`
+  );
 
   const elapsedMs = Date.now() - scriptStart;
   logStep(`Done in ${(elapsedMs / 1000).toFixed(1)}s`);
