@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { imageSize } from 'image-size';
 import { parseFrontmatter } from '../src/lib/frontmatter.mjs';
@@ -14,8 +15,10 @@ const imageManifest = {};
 const expectedPublicFiles = new Set();
 const scriptStart = Date.now();
 
+const GENERATOR_VERSION = 1;
 const RESPONSIVE_WIDTHS = [480, 768, 1024, 1440, 1920];
 let sharpModule = null;
+let previousImageManifest = {};
 
 function ensureDir(dirPath) {
   const resolvedPath = path.resolve(dirPath);
@@ -79,6 +82,10 @@ function publicPathToFilePath(publicPath) {
   return path.join(publicDir, relativePath.split('/').join(path.sep));
 }
 
+function hashBuffer(fileBuffer) {
+  return createHash('sha256').update(fileBuffer).digest('hex');
+}
+
 function shouldGenerateVariants(extension) {
   return ['.png', '.jpg', '.jpeg'].includes(extension);
 }
@@ -99,6 +106,85 @@ function markImageVariantOutputs(variants) {
   for (const variant of [...variants.webp, ...variants.fallback]) {
     markExpectedPublicPath(variant.src);
   }
+}
+
+function imageVariantFilePaths(entry) {
+  const variants = entry?.variants || {};
+  return [...(variants.webp || []), ...(variants.fallback || [])].map(variant =>
+    publicPathToFilePath(variant.src)
+  );
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasExpectedCacheMetadata(entry, sourceHash) {
+  return entry?.sourceHash === sourceHash && entry.generatorVersion === GENERATOR_VERSION;
+}
+
+function hasValidVariantList(variants) {
+  return variants.every(
+    variant =>
+      typeof variant?.src === 'string' &&
+      Number.isFinite(variant.width) &&
+      Number.isFinite(variant.height) &&
+      variant.width > 0 &&
+      variant.height > 0
+  );
+}
+
+function areVariantListsEqual(leftVariants, rightVariants) {
+  if (leftVariants.length !== rightVariants.length) {
+    return false;
+  }
+
+  return leftVariants.every((leftVariant, index) => {
+    const rightVariant = rightVariants[index];
+
+    return (
+      leftVariant.src === rightVariant.src &&
+      leftVariant.width === rightVariant.width &&
+      leftVariant.height === rightVariant.height
+    );
+  });
+}
+
+function hasValidImageManifestShape(entry, currentSize, currentVariants) {
+  return (
+    entry &&
+    entry.width === currentSize.width &&
+    entry.height === currentSize.height &&
+    Array.isArray(entry.variants?.webp) &&
+    Array.isArray(entry.variants?.fallback) &&
+    hasValidVariantList(entry.variants.webp) &&
+    hasValidVariantList(entry.variants.fallback) &&
+    areVariantListsEqual(entry.variants.webp, currentVariants.webp) &&
+    areVariantListsEqual(entry.variants.fallback, currentVariants.fallback)
+  );
+}
+
+function hasExistingGeneratedFiles(entry, originalOutputPath) {
+  return (
+    fs.existsSync(originalOutputPath) &&
+    imageVariantFilePaths(entry).every(filePath => fs.existsSync(filePath))
+  );
+}
+
+function getReusableImageEntry(previousEntry, currentSize, currentVariants, sourceHash, originalOutputPath) {
+  if (!hasExpectedCacheMetadata(previousEntry, sourceHash)) {
+    return null;
+  }
+
+  if (!hasValidImageManifestShape(previousEntry, currentSize, currentVariants)) {
+    return null;
+  }
+
+  if (!hasExistingGeneratedFiles(previousEntry, originalOutputPath)) {
+    return null;
+  }
+
+  return previousEntry;
 }
 
 function prepareOutputFile(filePath) {
@@ -166,6 +252,29 @@ function removeStalePublicEntries() {
   }
 
   return totals;
+}
+
+function loadPreviousImageManifest() {
+  if (!fs.existsSync(manifestPath)) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    return isPlainObject(parsed) ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function createImageManifestEntry(size, variants, sourceHash) {
+  return {
+    width: size.width,
+    height: size.height,
+    variants,
+    sourceHash,
+    generatorVersion: GENERATOR_VERSION
+  };
 }
 
 function readWorkEntry(mdxFilePath) {
@@ -290,6 +399,7 @@ async function registerImageMetadata(publicPath, sourcePath, outputDir, routePat
 
   try {
     const fileBuffer = fs.readFileSync(sourcePath);
+    const sourceHash = hashBuffer(fileBuffer);
     const size = imageSize(fileBuffer);
 
     if (!size?.width || !size?.height) {
@@ -300,14 +410,17 @@ async function registerImageMetadata(publicPath, sourcePath, outputDir, routePat
       width: size.width,
       height: size.height
     });
+    const reusableEntry = getReusableImageEntry(
+      previousImageManifest[publicPath],
+      size,
+      variants,
+      sourceHash,
+      publicPathToFilePath(publicPath)
+    );
+    const manifestEntry = reusableEntry || createImageManifestEntry(size, variants, sourceHash);
 
-    markImageVariantOutputs(variants);
-
-    imageManifest[publicPath] = {
-      width: size.width,
-      height: size.height,
-      variants
-    };
+    markImageVariantOutputs(manifestEntry.variants);
+    imageManifest[publicPath] = manifestEntry;
   } catch (_error) {
     // Skip files that cannot be measured.
   }
@@ -393,6 +506,7 @@ function writeImageManifest() {
 async function syncAssets() {
   logStep('Starting asset sync');
   preparePublicDirectory();
+  previousImageManifest = loadPreviousImageManifest();
 
   logStep('Syncing technology SVGs');
   const technologyCount = syncTechnologyAssets();
