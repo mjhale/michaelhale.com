@@ -69,6 +69,35 @@ function logStep(message) {
   console.log(`[sync-assets] ${message}`);
 }
 
+function preparePublicDirectory() {
+  logStep('Cleaning public directory');
+  cleanDir(publicDir);
+}
+
+function readWorkEntry(mdxFilePath) {
+  const sourceDir = path.dirname(mdxFilePath);
+  const source = fs.readFileSync(mdxFilePath, 'utf8');
+  const parsed = parseFrontmatter(source, mdxFilePath);
+  const routePath = normalizeWorkPath(parsed.data.path || '');
+
+  if (!routePath.startsWith('/work/')) {
+    throw new Error(`Invalid work path in ${mdxFilePath}: ${routePath}`);
+  }
+
+  return {
+    mdxFilePath,
+    routePath,
+    sourceDir,
+    outputDir: path.join(publicDir, routePath.replace(/^\//, ''))
+  };
+}
+
+function getWorkAssetFileNames(sourceDir) {
+  return fs
+    .readdirSync(sourceDir)
+    .filter(fileName => !fileName.endsWith('.mdx') && !fileName.startsWith('.'));
+}
+
 async function getSharpModule() {
   if (sharpModule) {
     return sharpModule;
@@ -216,41 +245,33 @@ function syncImageAssets() {
   return files.length;
 }
 
+async function syncWorkAsset(workEntry, assetFileName) {
+  const sourceFilePath = path.join(workEntry.sourceDir, assetFileName);
+  const outputFilePath = path.join(workEntry.outputDir, assetFileName);
+
+  fs.copyFileSync(sourceFilePath, outputFilePath);
+
+  await registerImageMetadata(
+    normalizePublicPath(path.join(workEntry.routePath, assetFileName)),
+    sourceFilePath,
+    workEntry.outputDir,
+    workEntry.routePath,
+    assetFileName
+  );
+}
+
 async function syncWorkAssets() {
   const mdxFiles = walk(workDir).filter(filePath => filePath.endsWith('.mdx'));
   let copiedAssetCount = 0;
 
   for (const [index, mdxFilePath] of mdxFiles.entries()) {
-    const sourceDir = path.dirname(mdxFilePath);
-    const source = fs.readFileSync(mdxFilePath, 'utf8');
-    const parsed = parseFrontmatter(source, mdxFilePath);
-    const routePath = normalizeWorkPath(parsed.data.path || '');
+    const workEntry = readWorkEntry(mdxFilePath);
+    ensureDir(workEntry.outputDir);
+    logStep(`Syncing work assets (${index + 1}/${mdxFiles.length}): ${workEntry.routePath}`);
 
-    if (!routePath.startsWith('/work/')) {
-      throw new Error(`Invalid work path in ${mdxFilePath}: ${routePath}`);
-    }
-
-    const outputDir = path.join(publicDir, routePath.replace(/^\//, ''));
-    ensureDir(outputDir);
-    logStep(`Syncing work assets (${index + 1}/${mdxFiles.length}): ${routePath}`);
-
-    const assets = fs
-      .readdirSync(sourceDir)
-      .filter(fileName => !fileName.endsWith('.mdx') && !fileName.startsWith('.'));
-
-    for (const assetFileName of assets) {
-      const sourceFilePath = path.join(sourceDir, assetFileName);
-      const outputFilePath = path.join(outputDir, assetFileName);
-      fs.copyFileSync(sourceFilePath, outputFilePath);
+    for (const assetFileName of getWorkAssetFileNames(workEntry.sourceDir)) {
+      await syncWorkAsset(workEntry, assetFileName);
       copiedAssetCount += 1;
-
-      await registerImageMetadata(
-        normalizePublicPath(path.join(routePath, assetFileName)),
-        sourceFilePath,
-        outputDir,
-        routePath,
-        assetFileName
-      );
     }
   }
 
@@ -268,24 +289,27 @@ function writeImageManifest() {
   );
 }
 
-logStep('Starting asset sync');
-logStep('Cleaning public directory');
-cleanDir(publicDir);
+async function syncAssets() {
+  logStep('Starting asset sync');
+  preparePublicDirectory();
 
-logStep('Syncing technology SVGs');
-const technologyCount = syncTechnologyAssets();
-logStep(`Copied ${technologyCount} technology icon(s)`);
+  logStep('Syncing technology SVGs');
+  const technologyCount = syncTechnologyAssets();
+  logStep(`Copied ${technologyCount} technology icon(s)`);
 
-logStep('Syncing shared image assets');
-const sharedImageCount = syncImageAssets();
-logStep(`Copied ${sharedImageCount} shared image asset(s)`);
+  logStep('Syncing shared image assets');
+  const sharedImageCount = syncImageAssets();
+  logStep(`Copied ${sharedImageCount} shared image asset(s)`);
 
-logStep('Syncing work entry assets');
-const { mdxCount, copiedAssetCount } = await syncWorkAssets();
-logStep(`Processed ${mdxCount} work file(s) and copied ${copiedAssetCount} work asset(s)`);
+  logStep('Syncing work entry assets');
+  const { mdxCount, copiedAssetCount } = await syncWorkAssets();
+  logStep(`Processed ${mdxCount} work file(s) and copied ${copiedAssetCount} work asset(s)`);
 
-logStep('Writing image manifest');
-writeImageManifest();
+  logStep('Writing image manifest');
+  writeImageManifest();
 
-const elapsedMs = Date.now() - scriptStart;
-logStep(`Done in ${(elapsedMs / 1000).toFixed(1)}s`);
+  const elapsedMs = Date.now() - scriptStart;
+  logStep(`Done in ${(elapsedMs / 1000).toFixed(1)}s`);
+}
+
+await syncAssets();
