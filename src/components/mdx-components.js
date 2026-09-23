@@ -112,6 +112,7 @@ function createMdxImageComponent(defaults) {
       return (
         <img
           {...props}
+          src={resolvedSrc}
           alt={alt}
           className="w-full border border-brand-ink"
           loading="lazy"
